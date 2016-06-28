@@ -7,7 +7,7 @@
 using namespace cv;
 using namespace std;
 
-#define DEBUG 0
+#define DEBUG 1
 
 /*
 The point (HAIR_X*saiyanHair.cols, HAIR_Y*saiyanHair.rows) is the coordinate
@@ -43,12 +43,13 @@ int main(int argc, char** argv) {
 	
 	namedWindow(windowName);
 	if (!face_cascade.load(faceCascadeName)) { printf("--(!)Error loading\n"); return -1; };
-	if (!eyes_cascade.load(left_eye_cascade_name)) { printf("--(!)Error loading\n"); return -1; };
 	
 	// If the file name of the image is provided as the second argument then draw on that frame
 	if (argc == 2) {
-
+		cout << "Still image" << endl;
 		frame = imread(argv[1]);
+		temp = Mat(frame.rows, frame.cols, CV_8UC3);
+		temp = Scalar(0, 0, 0);
 
 		if (detectFaces(frame)) {
 			drawSaiyan(frame);
@@ -56,15 +57,9 @@ int main(int argc, char** argv) {
 			cout << "Valid face not found " << endl;
 		}
 		
+		imwrite("saiyanMe.bmp", frame);
 		imshow(windowName, frame);
-		char key = waitKey(30);
-		if (key == 27) {
-			cout << "Esc key pressed, exiting." << endl;
-		}else if (key == 's') {
-			cout << "Image saved." << endl;
-			imwrite("saiyanMe.bmp", frame);
-
-		}
+		waitKey(0);
 		return 0;
 
 	}else {
@@ -169,7 +164,12 @@ void drawSaiyan(Mat & m) {
 		resize(saiyanHair, saiyanHair, size, 0, 0, INTER_LINEAR);
 
 	}
-	 
+	
+	if (DEBUG) {
+		cout << "size " << scale << endl;
+		cout << "new saiyanHair.rows " << saiyanHair.rows << endl;
+		cout << "new saiyanHair.cols " << saiyanHair.cols << endl;
+	}
 	// Coordinates of the center of the face wrt to the frame 
 	Point faceCenter(faces[0].x + faces[0].width / 2, faces[0].y + faces[0].height / 2);
 
