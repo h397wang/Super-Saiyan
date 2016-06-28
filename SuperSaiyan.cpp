@@ -42,7 +42,10 @@ float getAverageIntensity(Mat &);
 int main(int argc, char** argv) {
 	
 	namedWindow(windowName);
-	if (!face_cascade.load(faceCascadeName)) { printf("--(!)Error loading\n"); return -1; };
+	if (!face_cascade.load(faceCascadeName)) { 
+		cout << "--(!)Error loading\n"; 
+		return -1; 
+	}
 	
 	// If the file name of the image is provided as the second argument then draw on that frame
 	if (argc == 2) {
