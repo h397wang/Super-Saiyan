@@ -7,31 +7,30 @@
 using namespace cv;
 using namespace std;
 
+#define DEBUG 0
+
 /*
-TODO
-Extensibility: add different levels of saiyan.. improve the saiyan.png, provide a trackbar
-Add eye highlights, 
-Add different filters, also a track bar system...
-
+The point (HAIR_X*saiyanHair.cols, HAIR_Y*saiyanHair.rows) is the coordinate
+on the superSaiyan (mask) image where the center of the face should be placed.
+The reason for defining this ratio rather than the x and y coordinates is
+because the when the mask image is resized, these coordinates will change. 
+Keep in mind that the coordinate system for images assigns the pixel in 
+the top left corner as (0,0).
 */
-
-
-// the point (HAIR_X*saiyanHair.cols, HAIR_Y*saiyanHair.rows) is the coordinate on the saiyanHair image
-// where the center of the face should be placed
 #define HAIR_X 0.5
 #define HAIR_Y 0.865
 
-#define MOVEMENT_THRESHOLD 2.2 // lower value means, movement detection is more sensetive
+// lower value means, movement detection is more sensetive
+#define MOVEMENT_THRESHOLD 2.2 
 
 String faceCascadeName = "haarcascade_frontalface_alt.xml";
-String eyes_cascade_name = "haarcascade_eye_tree_eyeglasses.xml";
 CascadeClassifier face_cascade;
-CascadeClassifier eyes_cascade;
 
 Mat frame; Mat previousFrame;
 vector<Rect> faces; Rect face;
-Mat temp; // plain black image
+Mat temp; 
 
+String maskImg = "saiyan.png";
 String windowName = "Super Saiyan Filter";
 
 void drawSaiyan(Mat &);
@@ -44,8 +43,9 @@ int main(int argc, char** argv) {
 	
 	namedWindow(windowName);
 	if (!face_cascade.load(faceCascadeName)) { printf("--(!)Error loading\n"); return -1; };
-	if (!eyes_cascade.load(eyes_cascade_name)) { printf("--(!)Error loading\n"); return -1; };
+	if (!eyes_cascade.load(left_eye_cascade_name)) { printf("--(!)Error loading\n"); return -1; };
 	
+	// If the file name of the image is provided as the second argument then draw on that frame
 	if (argc == 2) {
 
 		frame = imread(argv[1]);
@@ -57,27 +57,38 @@ int main(int argc, char** argv) {
 		}
 		
 		imshow(windowName, frame);
-		waitKey(0); // this is the only reason why it doesnt crash immediately
+		waitKey(0); 
 		return 0;
 
 	}else {
 
-		VideoCapture cap(0); //capture the video from webcam
-		cap.read(previousFrame); // read a new frame from video
+		// Get the frame from the webcam, previousFrame is to be compared to the currentFrame
+		VideoCapture cap(0); 
+		cap.read(previousFrame); 
 
+		/* 
+		Create the an image that's all black, to mask will be super imposed on this 
+		This template will then be super imposed on the original frame
+		*/
 		temp = Mat(previousFrame.rows, previousFrame.cols, CV_8UC3);
 		temp = Scalar(0, 0, 0);
 
 		while (true) {
 
-			cap.read(frame); // read a new frame from video
+			cap.read(frame); 
 
+			/* 
+			If a valid face has been detected then we check if there has been significant
+			movement. If so then we recalculate the position of the mask and create a new template,
+			if not, then we simply super impose the template we already have. This is just my
+			crude way of optimization, having to recalculate the mask's position on every frame
+			slows down the program, reducing then number of frames per second and makes the
+			flickering more noticeable.
+			*/
 			if (detectFaces(frame)) {
 				if (detectMovement(frame(face), previousFrame(face))) {
 					drawSaiyan(frame);
 				}else {
-					// we dont want to recalculate the new position of the face
-					// the placement of the hair is preserved from the last frame
 					frame = frame + temp; 
 				}
 			}
@@ -85,8 +96,13 @@ int main(int argc, char** argv) {
 			imshow(windowName, frame);
 
 			cap.read(previousFrame);
-			if (waitKey(30) == 27){
-				cout << "Esc key is pressed by user" << endl;
+			char key = waitKey(30);
+			if (key == 27){
+				cout << "Esc key pressed, exiting." << endl;
+				break;
+			}else if (key == 's') {
+				cout << "Image saved." << endl;
+				imwrite("saiyanMe.bmp", frame); 
 				break;
 			}
 		}
@@ -96,9 +112,13 @@ int main(int argc, char** argv) {
 
 
 /*
-	Input: the Mat to be evaluated
-	Fills up vector<Rect> faces 
-	Check for and return validation of faces[0]
+	Input: the image mat to be evaluated
+	Output: whether or not a face was found
+	The general process before applying any feature detection is to convert to image to grey scale
+	and then adjusting the intensity of the pixels such that they are more evenly distributed.
+	Fills up vector<Rect> faces, but only the first element is evaluated. Sometimes the rect objects 
+	returned by detectMultiScale are erroneous so just check whether or not the rectangle can
+	fit in the original image
 */
 bool detectFaces(Mat & frame) {
 	Mat frameGray;
@@ -117,22 +137,22 @@ bool detectFaces(Mat & frame) {
 }
 
 /*
-	Input: the src mat to be modified
+	Input: the image mat to be modified
 	resizes the saiyanHair image, trims it and adds it onto the src
 */
 void drawSaiyan(Mat & m) {
 
-	// this must be read every time, or else global shit fucks up
-	Mat saiyanHair = imread("saiyan.png");
-	// this is global too, so reset is required
+	// This must image file must be read everytime because it gets resized
+	Mat saiyanHair = imread(maskImg);
+
+	// the temp mat is global, so it must be reset to all black
 	temp = Scalar(0, 0, 0);
 
-	// define the relationship between size of face and size of saiyanHair image
+	// Calculate the sizing scalethe saiyanHair image should be adjusted to based on the face size
 	double factor = 130;
 	int constant = 20;
 	double scale = (faces[0].width - constant) / factor;
 
-	cout << "scale " << scale << endl;
 	if (scale < 0) {
 		return;
 	}else if (scale < 1) {
@@ -142,26 +162,20 @@ void drawSaiyan(Mat & m) {
 		resize(saiyanHair, saiyanHair, size, 0, 0, INTER_LINEAR);
 
 	}
-	cout << "scale : " << scale << endl;
-	// since the src image isnt actually a square, it's not resizing as expected
-	// the axis arent actually multipled by some factor, doesnt work that way
 	 
-
-	// coordinates of the face's center wrt to src coordinates
+	// Coordinates of the center of the face wrt to the frame 
 	Point faceCenter(faces[0].x + faces[0].width / 2, faces[0].y + faces[0].height / 2);
 
 	int rightTrim = 0; int leftTrim = 0;
 	int topTrim = 0; int botTrim = 0;
 
-	// top left corner where the trimmedSaiyanHair is to be placed
+	// Initiate the coordinate point wrt the frame (top left corner) where the final mask is to be placed
 	Point placement(faceCenter.x - HAIR_X*saiyanHair.cols, faceCenter.y - HAIR_Y*saiyanHair.rows);
 
-	// defines the area trimmedSaiyanHair is obtained from saiyanHair
+	// Initiate the rectangle defining the region of interest on the resized mask
 	Rect roi(0, 0, saiyanHair.cols, saiyanHair.rows);
-	cout << "roi width on init " << roi.width << endl;
-	cout << "roi height on init " << roi.height << endl;
 
-	// if positive, then trim the right side of the saiyanHair
+	// If positive then trim the right side of the saiyanHair
 	rightTrim = faceCenter.x + HAIR_X*saiyanHair.cols - temp.cols; 
 	if (rightTrim < 0) {
 		rightTrim = 0;
@@ -170,7 +184,7 @@ void drawSaiyan(Mat & m) {
 		roi.width -= rightTrim;
 	}
 
-	// if positive then trim the left side
+	// If positive then trim the left side
 	leftTrim = - (faceCenter.x - HAIR_X*saiyanHair.cols);
 	if (leftTrim < 0) {
 		leftTrim = 0;
@@ -180,7 +194,7 @@ void drawSaiyan(Mat & m) {
 		roi.x = leftTrim;
 	}
 
-	// if positive, then trim the top side of the saiyanHair 
+	// If positive then trim the top side of the saiyanHair 
 	topTrim = -(faceCenter.y - HAIR_Y*saiyanHair.rows);
 	if (topTrim < 0) {
 		topTrim = 0;
@@ -190,7 +204,7 @@ void drawSaiyan(Mat & m) {
 		roi.y = topTrim;
 	}
 
-	// if positive then trim the bot 
+	// If positive then trim the bot 
 	botTrim = (faceCenter.y + (saiyanHair.rows - HAIR_Y*saiyanHair.rows) - temp.rows);
 	if (botTrim < 0) {
 		botTrim = 0;
@@ -198,50 +212,46 @@ void drawSaiyan(Mat & m) {
 		roi.height -= topTrim;
 	}
 
+	if (DEBUG) {
+		cout << "m cols" << m.cols << endl;
+		cout << "m rows " << m.rows << endl;
+		cout << "face x " << faceCenter.x << endl;
+		cout << "face y " << faceCenter.y << endl;
+		cout << "left Trim " << leftTrim << endl;
+		cout << "right Trim " << rightTrim << endl;
+		cout << "top Trim " << topTrim << endl;
+		cout << "bot Trim " << botTrim << endl;
+		cout << "roi heigh " << roi.height << endl;
+		cout << "roi width " << roi.width << endl;
+		cout << "roi x " << roi.x << endl;
+		cout << "roi y " << roi.y << endl;
+		cout << "placement x " << placement.x << endl;
+		cout << "placement y " << placement.y << endl;
+		cout << "saiyanHair.rows (resized) " << saiyanHair.rows << endl;
+		cout << "saiyanHair.cols (resized)" << saiyanHair.cols << endl;
+	}
 
-	cout << "m cols" << m.cols << endl;
-	cout << "m rows " << m.rows << endl;
-	cout << "face x " << faceCenter.x << endl;
-	cout << "face y " << faceCenter.y << endl;
-	cout << "left Trim " << leftTrim << endl;
-	cout << "right Trim " << rightTrim << endl;
-	cout << "top Trim " << topTrim << endl;
-	cout << "bot Trim " << botTrim << endl;
-	cout << "roi heigh " << roi.height << endl;
-	cout << "roi width " << roi.width << endl;
-	cout << "roi x " << roi.x << endl;
-	cout << "roi y " << roi.y << endl;
-	cout << "placement x " << placement.x << endl;
-	cout << "placement y " << placement.y << endl;
-	cout << "saiyanHair.rows (resized) " << saiyanHair.rows << endl;
-	cout << "saiyanHair.cols (resized)" << saiyanHair.cols << endl;
-
-	// there some rounding going on and it was off by 1
+	// There was some rounding with the conversion of doubles to ints so just to be safe
 	roi.height -= 10;
 	roi.width -= 10;
 
-	// resized and clipped version of saiyanHair
+	// Resized and trimmed version of saiyanHair
 	Mat	trimmedSaiyanHair = saiyanHair(roi);
-	cout << " roi selection success" << endl;
 
-	// rect wrt src coordinates defining where the trimmedSaiyanHair is to be placed
+	// Rect wrt the frame defining where the trimmedSaiyanHair is to be placed
 	Rect hairArea(placement, roi.size());
-	cout << " rect created " << endl;
 
-	// copies the trimmedSaiyanHair onto the plain black image
+	// Copy the trimmedSaiyanHair onto the plain black template
 	trimmedSaiyanHair.copyTo(temp(hairArea)); 
-	cout << " copy to success " << endl;
 
+	// Add the template onto the original
 	m = m + temp;
-
 }
 
 
 /*
-	Makes NO modifications to the inputs
-	Both inputs better be the same size
-	Return true if there's movement
-	Otherwise the scene's still so return false
+	Input: Two frames to be evaluated, obvsiously must be the same size.
+	Output: Return true if movement is detected, otherwise, false.
 */
 bool detectMovement(Mat & frame, Mat & previousFrame) {
 	
@@ -257,7 +267,10 @@ bool detectMovement(Mat & frame, Mat & previousFrame) {
 	}
 }
 
-
+/*
+	Input: Image mat to be evaluated, must be grey scale
+	Output: Average intensity value of all pixels in the image
+*/
 float getAverageIntensity(Mat &m) {
 	
 	int count = 0;
