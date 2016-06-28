@@ -57,7 +57,14 @@ int main(int argc, char** argv) {
 		}
 		
 		imshow(windowName, frame);
-		waitKey(0); 
+		char key = waitKey(30);
+		if (key == 27) {
+			cout << "Esc key pressed, exiting." << endl;
+		}else if (key == 's') {
+			cout << "Image saved." << endl;
+			imwrite("saiyanMe.bmp", frame);
+
+		}
 		return 0;
 
 	}else {
