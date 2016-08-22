@@ -7,7 +7,7 @@
 using namespace cv;
 using namespace std;
 
-#define DEBUG 1
+#define DEBUG 0
 
 /*
 The point (HAIR_X*saiyanHair.cols, HAIR_Y*saiyanHair.rows) is the coordinate
@@ -21,16 +21,16 @@ the top left corner as (0,0).
 #define HAIR_Y 0.865
 
 // lower value means, movement detection is more sensetive
-#define MOVEMENT_THRESHOLD 2.2 
+#define MOVEMENT_THRESHOLD 2.0
 
 String faceCascadeName = "haarcascade_frontalface_alt.xml";
-CascadeClassifier face_cascade;
+CascadeClassifier faceCascade;
 
 Mat frame; Mat previousFrame;
 vector<Rect> faces; Rect face;
 Mat temp; 
 
-String maskImg = "saiyan.png";
+String maskImg = "anna.png";
 String windowName = "Super Saiyan Filter";
 
 void drawSaiyan(Mat &);
@@ -42,7 +42,7 @@ float getAverageIntensity(Mat &);
 int main(int argc, char** argv) {
 	
 	namedWindow(windowName);
-	if (!face_cascade.load(faceCascadeName)) { 
+	if (!faceCascade.load(faceCascadeName)) { 
 		cout << "--(!)Error loading\n"; 
 		return -1; 
 	}
@@ -110,6 +110,7 @@ int main(int argc, char** argv) {
 				imwrite("saiyanMe.bmp", frame); 
 				break;
 			}
+			
 		}
 		return 0;
 	}
@@ -129,7 +130,7 @@ bool detectFaces(Mat & frame) {
 	Mat frameGray;
 	cvtColor(frame, frameGray, COLOR_BGR2GRAY);
 	equalizeHist(frameGray, frameGray);
-	face_cascade.detectMultiScale(frameGray, faces, 1.1, 4, 0, Size(100, 100));
+	faceCascade.detectMultiScale(frameGray, faces, 1.1, 4, 0, Size(100, 100));
 	
 	if (faces.size() != 0) {
 		face = faces[0];
@@ -153,7 +154,7 @@ void drawSaiyan(Mat & m) {
 	// the temp mat is global, so it must be reset to all black
 	temp = Scalar(0, 0, 0);
 
-	// Calculate the sizing scalethe saiyanHair image should be adjusted to based on the face size
+	// Calculate the sizing scale the saiyanHair image should be adjusted to based on the face size
 	double factor = 130;
 	int constant = 20;
 	double scale = (faces[0].width - constant) / factor;
@@ -173,6 +174,7 @@ void drawSaiyan(Mat & m) {
 		cout << "new saiyanHair.rows " << saiyanHair.rows << endl;
 		cout << "new saiyanHair.cols " << saiyanHair.cols << endl;
 	}
+
 	// Coordinates of the center of the face wrt to the frame 
 	Point faceCenter(faces[0].x + faces[0].width / 2, faces[0].y + faces[0].height / 2);
 
@@ -269,7 +271,7 @@ bool detectMovement(Mat & frame, Mat & previousFrame) {
 	cvtColor(res, res, COLOR_BGR2GRAY);
 
 	float averageInt = getAverageIntensity(res);
-	cout << averageInt << endl;
+	
 	if (averageInt > MOVEMENT_THRESHOLD) {
 		return true;
 	}else{
