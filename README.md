@@ -14,8 +14,8 @@ If enough movement is detected the mask image is resized and redrawn, otherwise 
 Matrix addition of pixels cause the "lighter" colours to appear. 
 To acheive an actual masking affect, we could simply do pixel assignment rather than pixel addition.
 
-Click here to see a crude video demo! Warning, music might be loud.
-https://www.youtube.com/watch?v=BXz5SZe-KbM&feature=youtu.be
+
+![](https://github.com/h397wang/Super-Saiyan/blob/master/sayiantrim.gif)
 
 Hindsight
 -----------------------------------------------------------------------------------------------------------------------------------------
